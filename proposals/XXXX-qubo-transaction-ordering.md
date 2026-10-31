@@ -196,9 +196,19 @@ batch and the order, using only integer arithmetic:
    `out = 0`, `out ≥ R_out`, or `out < minOut`.
    In a validator the re-simulation is the SVM itself (see Implementation).
 3. **Constraints** (violations ⇒ `pass = false`):
-   - `noNewReverts`: no transaction reverts that would not revert in arrival order;
+   - `noNewReverts`: no transaction reverts that would not revert in the
+     canonical order;
    - block and per-writable-account CU limits;
    - OPTIONAL `maxDisplacement`: `|pos(i) − arrivalRank(i)| ≤ d`.
+
+   The revert baseline is the canonical order, not arrival order, by design:
+   the canonical order is computable by any observer from the block alone,
+   while arrival order is a leader-local observation no third party can
+   verify. Basing the constraint on the canonical order keeps `pass` fully
+   recomputable by an auditor. (The fairness term in the objective remains
+   defined against arrival order; it is a scored preference, not a pass/fail
+   constraint, and it is the one term an auditor cannot recompute without
+   the leader's arrival record.)
 4. **Metrics**:
    - *Round-trip owners* `M`: signers that swap both directions on the same pool
      in the batch.
@@ -243,7 +253,16 @@ the repository README.)
 - **Phase 1 (this SIMD): leader-local policy, no consensus change.** Replay
   executes entries in the order the leader produced them, so other validators
   need not run the solver. The verifier and objective are standardised so
-  that anyone can audit a produced block after the fact.
+  that anyone can audit a produced block after the fact. Audit scope: `pass`,
+  the canonical order, and every objective term except fairness are
+  recomputable from the block alone; fairness is scored against the leader's
+  arrival order and can only be checked by a party holding that record.
+- **Reference implementation status.** The reference prototype currently
+  evaluates `noNewReverts` against arrival (FCFS) order, predating the
+  canonical-baseline definition above. Aligning the implementation and its
+  parity fixtures with this definition is a tracked follow-up; until then,
+  the fixtures' `verifierPass` results should be read with that difference
+  in mind.
 - The solver MAY be nondeterministic across clients (different hardware,
   timeouts). Only the verifier and canonical order MUST be bit-exact. No
   floating-point arithmetic is permitted in the verifier.
