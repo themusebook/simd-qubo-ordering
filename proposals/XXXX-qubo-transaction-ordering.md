@@ -2,7 +2,7 @@
 simd: 'XXXX'
 title: Verifier-Gated Intra-Batch Transaction Ordering via QUBO Solvers
 authors:
-  - cheshire (Fun Pump / x402.wtf)
+  - cheshire <cheshire@users.noreply.github.com> (Fun Pump / x402.wtf)
 category: Standard
 type: Core
 status: Draft
@@ -266,6 +266,11 @@ the repository README.)
 - In the prototype a 3-tx batch solves in ~1–12 ms and a 9-tx batch in ~20 ms
   in TypeScript on a commodity machine, not optimised. A production
   implementation would need to be measured in Rust inside the scheduler.
+- The budgets above bind a production implementation inside a validator
+  scheduler. The prototype timings are from the unoptimised TypeScript
+  reference running off-chain; they demonstrate the mechanism, not budget
+  conformance, which can only be assessed on an in-scheduler implementation
+  measured under scheduler conditions.
 
 ### Implementation: where it hooks into Agave
 
@@ -400,9 +405,28 @@ the devnet prototype and a test suite that checks, for each vector, the
 verifier metrics, score and canonical order. Client implementations SHOULD
 reproduce `verify()` outputs and state hashes on these vectors byte for byte.
 
+Two scoping notes on what the captured vectors can validate:
+
+- **Canonical order.** The captured canonical orders were produced by the
+  live prototype, whose tie-break hash is not the SHA-256 construction
+  standardised here (the repository README documents the `sha1-compat`
+  variant that reproduces the captured orders, and the parity tests exercise
+  the captured vectors under that variant). Verifier metrics and scores
+  reproduce byte for byte; a canonical order computed under this document's
+  SHA-256 tie-break will in general differ from the captured order on the
+  same batch. Canonical-order conformance MUST therefore be checked against
+  vectors generated under the SHA-256 tie-break defined in "Canonical
+  fallback", not against the captured live vectors.
+- **State hash.** The fixtures carry the live prototype's state hashes,
+  which use a definition that was not recoverable (see the repository
+  README). The state hash standardised here is the one defined in
+  "Deterministic verifier" step 6; conformance vectors for it come from the
+  reference implementation, not from the captured live responses.
+
 ## References
 
-- Reference prototype (TypeScript, Apache-2.0): this repository (to be published).
+- Reference prototype (TypeScript, Apache-2.0):
+  https://github.com/themusebook/simd-qubo-ordering
 - Live demo: https://devnet.x402.wtf/simd420 (off-chain, devnet).
 - Agave banking stage scheduler:
   https://github.com/anza-xyz/agave/tree/master/core/src/banking_stage/transaction_scheduler
