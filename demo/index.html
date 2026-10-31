@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SIMD-XXXX · QUBO transaction ordering — live demo</title>
+<style>
+:root{--bg:#07090f;--panel:#0e1320;--panel2:#121a2b;--line:#1f2a40;--txt:#e6ecff;--mut:#8592b3;--acc:#7c5cff;--acc2:#19d3c5;--bad:#ff5c7a;--warn:#ffb547;--ok:#3ee38f;--atk:#ff5c7a;--vic:#ffb547;--usr:#5aa8ff;--xfer:#8592b3}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(1200px 600px at 10% -10%,#1b1440 0,transparent 60%),radial-gradient(900px 500px at 110% 0,#06343a 0,transparent 55%),var(--bg);color:var(--txt);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Inter,sans-serif;min-height:100vh}
+.wrap{max-width:1280px;margin:0 auto;padding:22px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+h1{margin:0;font-size:22px;letter-spacing:.2px}h1 b{background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--mut);font-size:12.5px;max-width:720px}
+.badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--mut);margin-right:6px}
+.badge.draft{border-color:#5a4500;color:var(--warn);background:#2a2000}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);padding:10px;border-radius:14px}
+.seg{display:flex;background:#0a0f1a;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{background:none;border:0;color:var(--mut);padding:8px 12px;cursor:pointer;font-weight:600}
+.seg button.on{background:linear-gradient(180deg,#22184d,#171236);color:var(--txt)}
+input{background:#0a0f1a;border:1px solid var(--line);color:var(--txt);padding:8px 10px;border-radius:10px;width:190px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+.run{background:linear-gradient(90deg,var(--acc),#5b3dff);border:0;color:#fff;padding:9px 16px;border-radius:10px;font-weight:700;cursor:pointer;box-shadow:0 6px 24px #7c5cff55}
+.run:disabled{opacity:.6;cursor:wait}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.card{background:linear-gradient(180deg,var(--panel),#0b101b);border:1px solid var(--line);border-radius:16px;padding:14px;position:relative;overflow:hidden}
+.card h3{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:var(--mut);font-weight:700}
+.metrics{grid-column:span 12;display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+.m{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:12px}
+.m .k{color:var(--mut);font-size:11.5px}.m .row{display:flex;justify-content:space-between;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;margin-top:4px}
+.m .big{font-size:22px;font-weight:800;margin-top:4px;font-family:ui-monospace,Menlo,monospace}
+.lanes{grid-column:span 12}
+.lane{display:grid;grid-template-columns:170px 1fr 120px;align-items:center;gap:12px;padding:10px 0;border-top:1px dashed var(--line)}
+.lane:first-of-type{border-top:0}
+.lname{font-weight:700}.lname small{display:block;color:var(--mut);font-weight:500;font-size:11.5px}
+.track{position:relative;height:46px;background:repeating-linear-gradient(90deg,#0a0f1a 0,#0a0f1a 2px,transparent 2px,transparent 60px),#0a0f1a;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.chip{position:absolute;top:6px;height:32px;min-width:96px;padding:0 10px;border-radius:9px;display:flex;align-items:center;gap:6px;font:600 12px ui-monospace,Menlo,monospace;white-space:nowrap;transition:left .9s cubic-bezier(.2,.8,.2,1),opacity .4s;border:1px solid #ffffff22;box-shadow:0 4px 14px #0008}
+.chip i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.chip.rev{outline:2px solid var(--bad);text-decoration:line-through}
+.score{font:800 16px ui-monospace,Menlo,monospace;text-align:right}.score small{display:block;font-size:11px;color:var(--mut);font-weight:500}
+.energy{grid-column:span 7}.price{grid-column:span 5}
+canvas{width:100%;display:block}
+.foot{grid-column:span 12;color:var(--mut);font-size:12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.mono{font-family:ui-monospace,Menlo,monospace}
+.pill{font-size:11px;padding:2px 8px;border-radius:99px;font-weight:700}
+.pill.ok{background:#0b2d1c;color:var(--ok)}.pill.fb{background:#2d1e00;color:var(--warn)}.pill.bad{background:#2d0b14;color:var(--bad)}
+.legend{display:flex;gap:12px;font-size:11.5px;color:var(--mut);margin-bottom:6px}.legend span{display:flex;align-items:center;gap:5px}.legend i{width:10px;height:3px;display:inline-block;border-radius:2px}
+@media(max-width:900px){.metrics{grid-template-columns:repeat(2,1fr)}.energy,.price{grid-column:span 12}.lane{grid-template-columns:1fr}}
+</style></head><body><div class="wrap">
+<header><div>
+<div><span class="badge draft">DRAFT SIMD · not submitted</span><span class="badge">off-chain reference prototype</span><span class="badge">no quantum hardware</span></div>
+<h1>QUBO transaction ordering <b>— verifier-gated, with canonical fallback</b></h1>
+<div class="sub">A batch is encoded as a QUBO, a quantum-inspired SA + tabu solver proposes an order, and a deterministic verifier re-simulates the constant-product AMM, checks constraints and scores it. If the solver fails or loses, the canonical order (fee desc, then seeded hash) is used. Everything below is computed in your browser.</div>
+</div>
+<div class="controls"><div class="seg" id="presets"><button data-p="sandwich" class="on">Sandwich</button><button data-p="mixed">Mixed</button><button data-p="random">Random</button></div>
+<input id="seed" value="demo-blockhash-1" spellcheck="false" title="seed / blockhash"><button class="run" id="run">▶ Run solver</button></div>
+</header>
+<div class="grid">
+<div class="metrics" id="metrics"></div>
+<div class="card lanes"><h3>Execution order · <span id="srcinfo" class="mono"></span></h3><div id="lanes"></div></div>
+<div class="card energy"><h3>Annealing energy (QUBO, feasible subspace) <span id="einfo" class="mono" style="float:right;text-transform:none;letter-spacing:0"></span></h3>
+<div class="legend"><span><i style="background:#7c5cff"></i>current</span><span><i style="background:#19d3c5"></i>best</span><span><i style="background:#ffb547"></i>temperature</span></div><canvas id="ec" height="240"></canvas></div>
+<div class="card price"><h3>AMM spot price path · <span id="pinfo" class="mono" style="text-transform:none;letter-spacing:0"></span></h3>
+<div class="legend"><span><i style="background:#ff5c7a"></i>FCFS</span><span><i style="background:#19d3c5"></i>optimized</span><span><i style="background:#ffb547"></i>fallback</span></div><canvas id="pc" height="240"></canvas></div>
+<div class="foot"><div id="hash" class="mono"></div><div>Off-chain reference prototype for a DRAFT SIMD. Not running inside any Solana validator. Numbers come from synthetic batches.</div></div>
+</div></div>
+<script>
+const PRESETS={"sandwich": {"seed": "demo-blockhash-1", "pools": [{"id": "pool:MEME", "reserveA": "1000000000000", "reserveB": "1000000000000", "feeBps": 25}], "txs": [{"id": "atk-front", "owner": "attacker", "arrival": 0, "feeLamports": 900000, "swap": {"pool": "pool:MEME", "dir": "AtoB", "amountIn": "30000000000", "minOut": "0"}}, {"id": "victim", "owner": "alice", "arrival": 1, "feeLamports": 5000, "swap": {"pool": "pool:MEME", "dir": "AtoB", "amountIn": "50000000000", "minOut": "42755089891"}}, {"id": "atk-back", "owner": "attacker", "arrival": 2, "feeLamports": 900000, "swap": {"pool": "pool:MEME", "dir": "BtoA", "amountIn": "29055513751", "minOut": "0"}}], "spec": {"weights": {"mev": 10, "slippage": 5, "fairness": 1, "revert": 5}, "blockCuLimit": 48000000, "accountCuLimit": 12000000, "maxDisplacement": null, "noNewReverts": true}}, "mixed": {"seed": "demo-blockhash-2", "pools": [{"id": "pool:MEME", "reserveA": "1000000000000", "reserveB": "1000000000000", "feeBps": 25}, {"id": "pool:CLAWD", "reserveA": "400000000000", "reserveB": "2000000000000", "feeBps": 25}], "txs": [{"id": "atk-front", "owner": "attacker", "arrival": 0, "feeLamports": 900000, "swap": {"pool": "pool:MEME", "dir": "AtoB", "amountIn": "30000000000", "minOut": "0"}}, {"id": "victim", "owner": "alice", "arrival": 3, "feeLamports": 5000, "swap": {"pool": "pool:MEME", "dir": "AtoB", "amountIn": "50000000000", "minOut": "42755089891"}}, {"id": "atk-back", "owner": "attacker", "arrival": 6, "feeLamports": 900000, "swap": {"pool": "pool:MEME", "dir": "BtoA", "amountIn": "29055513751", "minOut": "0"}}, {"id": "bob-buy", "owner": "bob", "arrival": 1, "feeLamports": 10000, "swap": {"pool": "pool:CLAWD", "dir": "AtoB", "amountIn": "12000000000", "minOut": "0"}}, {"id": "carol-sell", "owner": "carol", "arrival": 2, "feeLamports": 8000, "swap": {"pool": "pool:CLAWD", "dir": "BtoA", "amountIn": "40000000000", "minOut": "0"}}, {"id": "dave-buy", "owner": "dave", "arrival": 4, "feeLamports": 20000, "swap": {"pool": "pool:CLAWD", "dir": "AtoB", "amountIn": "6000000000", "minOut": "0"}}, {"id": "xfer-1", "owner": "erin", "arrival": 5, "feeLamports": 5000, "swap": null}, {"id": "xfer-2", "owner": "gus", "arrival": 7, "feeLamports": 5000, "swap": null}, {"id": "ivy-buy", "owner": "ivy", "arrival": 8, "feeLamports": 15000, "swap": {"pool": "pool:MEME", "dir": "AtoB", "amountIn": "4000000000", "minOut": "0"}}], "spec": {"weights": {"mev": 10, "slippage": 5, "fairness": 1, "revert": 5}, "blockCuLimit": 48000000, "accountCuLimit": 12000000, "maxDisplacement": null, "noNewReverts": true}}};
+// ---------- sha256 / sha1 (sync, for seeded tie-break + PRNG; matches the TS reference) ----------
+function utf8(s){return new TextEncoder().encode(s)}
+function sha256(msg){const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+const m=utf8(msg),l=m.length,nb=((l+9+63)>>6)<<6,b=new Uint8Array(nb);b.set(m);b[l]=0x80;const bl=l*8;for(let i=0;i<8;i++)b[nb-1-i]=Math.floor(bl/2**(8*i))&255;
+let H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];const W=new Uint32Array(64),r=(x,n)=>(x>>>n)|(x<<(32-n));
+for(let o=0;o<nb;o+=64){for(let i=0;i<16;i++)W[i]=(b[o+4*i]<<24)|(b[o+4*i+1]<<16)|(b[o+4*i+2]<<8)|b[o+4*i+3];for(let i=16;i<64;i++){const s0=r(W[i-15],7)^r(W[i-15],18)^(W[i-15]>>>3),s1=r(W[i-2],17)^r(W[i-2],19)^(W[i-2]>>>10);W[i]=(W[i-16]+s0+W[i-7]+s1)|0}
+let[a,b2,c,d,e,f,g,h]=H;for(let i=0;i<64;i++){const S1=r(e,6)^r(e,11)^r(e,25),ch=(e&f)^(~e&g),t1=(h+S1+ch+K[i]+W[i])|0,S0=r(a,2)^r(a,13)^r(a,22),mj=(a&b2)^(a&c)^(b2&c),t2=(S0+mj)|0;h=g;g=f;f=e;e=(d+t1)|0;d=c;c=b2;b2=a;a=(t1+t2)|0}
+H=[H[0]+a,H[1]+b2,H[2]+c,H[3]+d,H[4]+e,H[5]+f,H[6]+g,H[7]+h].map(x=>x|0)}return new Uint8Array(H.flatMap(x=>[x>>>24&255,x>>>16&255,x>>>8&255,x&255]))}
+const hex=u=>[...u].map(x=>x.toString(16).padStart(2,'0')).join('');
+function rng(label){const h=sha256(label),u=i=>(h[i]|h[i+1]<<8|h[i+2]<<16|h[i+3]<<24)>>>0;let a=u(0),b=u(4),c=u(8),d=u(12);return()=>{a>>>=0;b>>>=0;c>>>=0;d>>>=0;const t=(a+b)|0;a=b^(b>>>9);b=(c+(c<<3))|0;c=(c<<21)|(c>>>11);d=(d+1)|0;const r=(t+d)|0;c=(c+r)|0;return(r>>>0)/4294967296}}
+// ---------- engine (port of src/*.ts) ----------
+const E6=1000000n;
+function parse(j){return{seed:j.seed,spec:j.spec,pools:j.pools.map(p=>({id:p.id,reserveA:BigInt(p.reserveA),reserveB:BigInt(p.reserveB),feeBps:p.feeBps})),txs:j.txs.map(t=>({...t,swap:t.swap?{...t.swap,amountIn:BigInt(t.swap.amountIn),minOut:BigInt(t.swap.minOut)}:null}))}}
+function quote(p,s){const fee=s.amountIn*BigInt(p.feeBps)/10000n,ai=s.amountIn-fee;const[ri,ro]=s.dir==='AtoB'?[p.reserveA,p.reserveB]:[p.reserveB,p.reserveA];if(ai<=0n)return 0n;return ro*ai/(ri+ai)}
+const bToA=(p,b)=>p.reserveB===0n?0n:b*p.reserveA/p.reserveB;
+function mevOwners(txs){const m=new Map();for(const t of txs)if(t.swap){const k=t.owner+'|'+t.swap.pool;(m.get(k)||m.set(k,new Set()).get(k)).add(t.swap.dir)}const o=new Set();for(const[k,v]of m)if(v.size===2)o.add(k.split('|')[0]);return o}
+function notional(b){const P=new Map(b.pools.map(p=>[p.id,p]));let v=0n;for(const t of b.txs)if(t.swap)v+=t.swap.dir==='AtoB'?t.swap.amountIn:bToA(P.get(t.swap.pool),t.swap.amountIn);return v}
+function simulate(b,order){const P=new Map(b.pools.map(p=>[p.id,{...p}])),T=new Map(b.txs.map(t=>[t.id,t])),ex=new Map(),rev=[],path=[];const p0=b.pools[0];path.push(Number(p0.reserveA)/Number(p0.reserveB));
+for(const id of order){const t=T.get(id);if(t.swap){const p=P.get(t.swap.pool),o=quote(p,t.swap),ro=t.swap.dir==='AtoB'?p.reserveB:p.reserveA;if(o<=0n||o>=ro||o<t.swap.minOut)rev.push(id);else{if(t.swap.dir==='AtoB'){p.reserveA+=t.swap.amountIn;p.reserveB-=o}else{p.reserveB+=t.swap.amountIn;p.reserveA-=o}ex.set(id,o)}}const q=P.get(p0.id);path.push(Number(q.reserveA)/Number(q.reserveB))}return{ex,rev,path,P}}
+function verify(b,order){const w=b.spec.weights,sim=simulate(b,order),P0=new Map(b.pools.map(p=>[p.id,p])),mo=mevOwners(b.txs),T=new Map(b.txs.map(t=>[t.id,t]));const net=new Map();let ss=0n,sn=0n,loss=0n;
+for(const id of order){const t=T.get(id);if(!t.swap||!sim.ex.has(id))continue;const o=sim.ex.get(id),p0=P0.get(t.swap.pool);
+if(mo.has(t.owner)){const n=net.get(t.owner)||net.set(t.owner,{a:0n,bb:new Map()}).get(t.owner),db=n.bb.get(t.swap.pool)||0n;if(t.swap.dir==='AtoB'){n.a-=t.swap.amountIn;n.bb.set(t.swap.pool,db+o)}else{n.a+=o;n.bb.set(t.swap.pool,db-t.swap.amountIn)}}
+else{const ref=quote({...p0},t.swap),d=ref-o;loss+=t.swap.dir==='AtoB'?bToA(p0,d):d;if(ref>0n)ss+=d>0n?d*E6/ref:0n;sn++}}
+let mev=0n;for(const n of net.values()){let v=n.a;for(const[pid,db]of n.bb)v+=bToA(P0.get(pid),db);if(v>0n)mev+=v}
+const N=notional(b),mevE6=N>0n?mev*E6/N:0n,slipE6=sn>0n?ss/sn:0n,arr=new Map(b.txs.map(t=>[t.id,t.arrival]));let disc=0;for(let i=0;i<order.length;i++)for(let j=i+1;j<order.length;j++)if(arr.get(order[i])>arr.get(order[j]))disc++;
+const pairs=order.length*(order.length-1)/2,discE6=pairs>0?BigInt(disc)*E6/BigInt(pairs):0n,revE6=BigInt(sim.rev.length)*E6/BigInt(Math.max(1,b.txs.length));
+const fcfs=[...b.txs].sort((x,y)=>x.arrival-y.arrival).map(t=>t.id),base=new Set(simulate(b,fcfs).rev),viol=[];if(b.spec.noNewReverts)for(const r of sim.rev)if(!base.has(r))viol.push('new-revert:'+r);
+const score=BigInt(w.mev)*mevE6+BigInt(w.slippage)*slipE6+BigInt(w.fairness)*discE6+BigInt(w.revert)*revE6;
+return{order,pass:!viol.length,viol,path:sim.path,rev:sim.rev,m:{mev:Number(mev)/1e9,slip:Number(slipE6)/1e4,loss:Number(loss)/1e9,fair:Number(E6-discE6)/1e6,reverts:sim.rev.length,score}}}
+function canonical(b){return b.txs.map(t=>({t,k:hex(sha256('simd-qubo-ordering/canonical/v1:'+b.seed+':'+t.id))})).sort((x,y)=>y.t.feeLamports-x.t.feeLamports||(x.k<y.k?-1:x.k>y.k?1:0)).map(x=>x.t.id)}
+function qubo(b){const n=b.txs.length,mo=mevOwners(b.txs),N=Number(notional(b)),nn=b.txs.filter(t=>t.swap&&!mo.has(t.owner)).length,pairs=Math.max(1,n*(n-1)/2),w=b.spec.weights;
+const C=b.txs.map((ti,a)=>b.txs.map((tj,c)=>{if(a===c)return 0;let v=ti.arrival>tj.arrival?w.fairness*1e6/pairs:0;if(!ti.swap||!tj.swap||ti.swap.pool!==tj.swap.pool)return v;
+const p0=b.pools.find(p=>p.id===ti.swap.pool),p={...p0},oi=quote(p,ti.swap);if(oi>=ti.swap.minOut){if(ti.swap.dir==='AtoB'){p.reserveA+=ti.swap.amountIn;p.reserveB-=oi}else{p.reserveB+=ti.swap.amountIn;p.reserveA-=oi}}
+const oj=quote(p,tj.swap),rj=quote({...p0},tj.swap);if(oj<tj.swap.minOut)v+=w.revert*1e6/Math.max(1,n);if(!mo.has(tj.owner)&&rj>0n)v+=w.slippage*1e6*Math.max(0,Number(rj-oj)/Number(rj))/Math.max(1,nn);
+if(mo.has(ti.owner)&&ti.owner===tj.owner&&ti.swap.dir!==tj.swap.dir){const g=ti.swap.dir==='AtoB'?Number(oj)-Number(ti.swap.amountIn):Number(bToA(p0,oj-tj.swap.amountIn));if(g>0&&N>0)v+=w.mev*1e6*g/N}return v}));return{n,ids:b.txs.map(t=>t.id),C}}
+const pE=(q,p)=>{let e=0;for(let a=0;a<p.length;a++)for(let c=a+1;c<p.length;c++)e+=q.C[p[a]][p[c]];return e};
+function* saTabu(q,seed){const n=q.n,it=Math.max(200,400*n),R=4,ten=Math.max(2,n>>1),rand=rng('simd-qubo-ordering/solver/v1:'+seed);let gB=[...Array(n).keys()],gE=pE(q,gB);if(n<2)return{perm:gB,energy:gE};let sc=0;for(const r of q.C)for(const c of r)sc=Math.max(sc,Math.abs(c));const T0=Math.max(1,sc),T1=T0*1e-4;let k0=0;
+for(let r=0;r<R;r++){const cur=[...Array(n).keys()];for(let i=n-1;i>0;i--){const j=Math.floor(rand()*(i+1));[cur[i],cur[j]]=[cur[j],cur[i]]}let e=pE(q,cur),best=[...cur],bE=e;const tabu=new Map();
+for(let k=0;k<it;k++,k0++){const T=T0*Math.pow(T1/T0,k/it),a=Math.floor(rand()*n);let c=Math.floor(rand()*(n-1));if(c>=a)c++;const ins=rand()<.5,cd=[...cur];if(ins){const[m]=cd.splice(a,1);cd.splice(c,0,m)}else[cd[a],cd[c]]=[cd[c],cd[a]];
+const key=Math.min(cur[a],cur[c])+'-'+Math.max(cur[a],cur[c]),ce=pE(q,cd),d=ce-e,tb=(tabu.get(key)??-1)>k&&ce>=bE;if(!tb&&(d<=0||rand()<Math.exp(-d/T))){cur.splice(0,n,...cd);e=ce;tabu.set(key,k+ten);if(e<bE){bE=e;best=[...cur]}}
+if(k%Math.max(1,it/100|0)===0)yield{iter:k0,energy:e,best:Math.min(bE,gE),temp:T}}if(bE<gE){gE=bE;gB=best}}return{perm:gB,energy:gE}}
+function polish(b,starts){let gB=starts[0],gS=verify(b,gB);for(const s of starts){let best=s,bs=verify(b,best);for(let r=0;r<100;r++){let nb=best,ns=bs;for(let i=0;i<best.length;i++)for(let j=0;j<best.length;j++){if(i===j)continue;const c=[...best];const[m]=c.splice(i,1);c.splice(j,0,m);const v=verify(b,c);if(v.pass&&(!ns.pass||v.m.score<ns.m.score)){nb=c;ns=v}}if(nb===best)break;best=nb;bs=ns}if(bs.pass&&(!gS.pass||bs.m.score<gS.m.score)){gB=best;gS=bs}}return gB}
+// ---------- random preset (seeded) ----------
+function randomBatch(seed){const r=rng('random-preset:'+seed),L=1e9,big=x=>String(BigInt(Math.round(x)));const pools=[{id:'pool:MEME',reserveA:String(1000n*BigInt(L)),reserveB:String(1000n*BigInt(L)),feeBps:25},{id:'pool:CLAWD',reserveA:String(400n*BigInt(L)),reserveB:String(2000n*BigInt(L)),feeBps:30}];const txs=[];const n=5+Math.floor(r()*5);
+const names=['ana','ben','cy','dee','eli','fay','gil','hal','ivy','jo','kai','lu'];let arr=0;const victimAt=1+Math.floor(r()*(n-2));
+for(let i=0;i<n;i++){if(i===victimAt){txs.push({id:'atk-front',owner:'attacker',arrival:arr++,feeLamports:900000,swap:{pool:'pool:MEME',dir:'AtoB',amountIn:big((15+r()*25)*L),minOut:'0'}});const amt=(20+r()*40)*L,ref=Number(quote({reserveA:1000n*BigInt(L),reserveB:1000n*BigInt(L),feeBps:25},{dir:'AtoB',amountIn:BigInt(Math.round(amt))}));txs.push({id:'victim',owner:'victim',arrival:arr++,feeLamports:5000,swap:{pool:'pool:MEME',dir:'AtoB',amountIn:big(amt),minOut:big(ref*(.9+r()*.05))}});continue}
+const nm=names[i%names.length];if(r()<.2){txs.push({id:'xfer-'+nm,owner:nm,arrival:arr++,feeLamports:5000,swap:null});continue}const pool=r()<.5?'pool:MEME':'pool:CLAWD',dir=r()<.6?'AtoB':'BtoA';txs.push({id:nm+(dir==='AtoB'?'-buy':'-sell'),owner:nm,arrival:arr++,feeLamports:[5000,8000,10000,15000,20000][Math.floor(r()*5)],swap:{pool,dir,amountIn:big((2+r()*20)*L*(dir==='BtoA'&&pool==='pool:CLAWD'?5:1)),minOut:'0'}})}
+const front=txs.find(t=>t.id==='atk-front');const fo=quote({reserveA:1000n*BigInt(L),reserveB:1000n*BigInt(L),feeBps:25},{dir:'AtoB',amountIn:BigInt(front.swap.amountIn)});txs.push({id:'atk-back',owner:'attacker',arrival:arr++,feeLamports:900000,swap:{pool:'pool:MEME',dir:'BtoA',amountIn:String(fo),minOut:'0'}});
+return{seed,pools,txs,spec:PRESETS.sandwich.spec}}
+// ---------- UI ----------
+let preset='sandwich';const STATIC=new URLSearchParams(location.search).has('static');const $=s=>document.querySelector(s);const fmt=(x,d)=>Number(x).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+function color(t){if(t.owner==='attacker')return'var(--atk)';if(!t.swap)return'var(--xfer)';if(t.swap.minOut>0n)return'var(--vic)';return'var(--usr)'}
+const ec=$('#ec'),pc=$('#pc');function fit(c){const d=devicePixelRatio||1,w=c.clientWidth,h=c.height/(c._d||1);c._d=d;c.width=w*d;c.height=h*d;c.style.height=h+'px';const x=c.getContext('2d');x.setTransform(d,0,0,d,0,0);return{x,w,h}}
+function axes(x,w,h,pad){x.strokeStyle='#1f2a40';x.lineWidth=1;for(let i=0;i<=4;i++){const y=pad+(h-2*pad)*i/4;x.beginPath();x.moveTo(pad,y);x.lineTo(w-8,y);x.stroke()}}
+function drawEnergy(tr){const{x,w,h}=fit(ec),pad=28;x.clearRect(0,0,w,h);axes(x,w,h,pad);if(!tr.length)return;const maxI=Math.max(1,tr[tr.length-1].iter),es=tr.map(t=>t.energy),lo=Math.min(...es),hi=Math.max(...es)||1,X=i=>pad+(w-pad-8)*i/maxI,Y=e=>pad+(h-2*pad)*(1-(e-lo)/((hi-lo)||1)),tmax=tr[0].temp||1;
+x.fillStyle='#8592b3';x.font='11px ui-monospace';x.fillText(fmt(hi,0),4,pad-8);x.fillText(fmt(lo,0),4,h-pad+16);
+const line=(f,c,lw)=>{x.beginPath();tr.forEach((t,i)=>{const yy=f(t);i?x.lineTo(X(t.iter),yy):x.moveTo(X(t.iter),yy)});x.strokeStyle=c;x.lineWidth=lw;x.stroke()};
+line(t=>pad+(h-2*pad)*(1-Math.log10(1+9*t.temp/tmax)),'#ffb54766',1.2);line(t=>Y(t.energy),'#7c5cff',1.4);line(t=>Y(t.best),'#19d3c5',2.4);
+const g=x.createLinearGradient(0,pad,0,h);g.addColorStop(0,'#19d3c522');g.addColorStop(1,'#19d3c500');x.lineTo(X(tr[tr.length-1].iter),h-pad);x.lineTo(X(tr[0].iter),h-pad);x.fillStyle=g;x.fill()}
+function drawPrice(paths,ids){const{x,w,h}=fit(pc),pad=28;x.clearRect(0,0,w,h);axes(x,w,h,pad);const all=paths.flatMap(p=>p.d),lo=Math.min(...all),hi=Math.max(...all),n=paths[0].d.length-1,X=i=>pad+(w-pad-12)*i/n,Y=v=>pad+(h-2*pad)*(1-(v-lo)/((hi-lo)||1));
+x.fillStyle='#8592b3';x.font='11px ui-monospace';x.fillText(hi.toFixed(4),2,pad-8);x.fillText(lo.toFixed(4),2,h-pad+16);
+paths.forEach(p=>{x.beginPath();p.d.forEach((v,i)=>{const xx=X(i),yy=Y(v);if(!i)x.moveTo(xx,yy);else{x.lineTo(xx,Y(p.d[i-1]));x.lineTo(xx,yy)}});x.strokeStyle=p.c;x.lineWidth=p.w;x.setLineDash(p.dash||[]);x.stroke();x.setLineDash([]);p.d.forEach((v,i)=>{x.beginPath();x.arc(X(i),Y(v),2.5,0,7);x.fillStyle=p.c;x.fill()})})}
+function lanes(b,rows){const T=new Map(b.txs.map(t=>[t.id,t]));$('#lanes').innerHTML=rows.map((r,k)=>`<div class="lane"><div class="lname">${r.name}<small>${r.note}</small></div><div class="track" id="tr${k}"></div><div class="score">${fmt(Number(r.v.m.score),0)}<small>objective</small></div></div>`).join('');
+rows.forEach((r,k)=>{const tr=$('#tr'+k),W=tr.clientWidth,n=r.v.order.length,step=Math.max(70,(W-110)/Math.max(1,n-1));const cw=Math.min(118,step-6);r.v.order.forEach((id,i)=>{const t=T.get(id),c=document.createElement('div');c.className='chip'+(r.v.rev.includes(id)?' rev':'');const L=(6+i*Math.min(step,(W-cw-12)/Math.max(1,n-1)));c.style.cssText=`left:${STATIC?L:-160}px;min-width:${cw}px;background:linear-gradient(180deg,#141c2f,#0f1626);color:#e6ecff`;c.innerHTML=`<i style="background:${color(t)}"></i>${id}`;c.title=`${id} · owner ${t.owner} · arrival ${t.arrival} · fee ${t.feeLamports}`;tr.appendChild(c);if(!STATIC)setTimeout(()=>{c.style.left=L+'px'},60+i*90+k*140)})})}
+function cards(F,O,C,res){const c=(k,f,d,better)=>`<div class="m"><div class="k">${k}</div>${[['FCFS',F],['optimized',O],['fallback',C]].map(([n,v])=>`<div class="row"><span style="color:var(--mut)">${n}</span><b>${f(v.m)}</b></div>`).join('')}</div>`;
+const imp=Number(F.m.score)?(1-Number(O.m.score)/Number(F.m.score))*100:0;
+$('#metrics').innerHTML=`<div class="m"><div class="k">Objective vs FCFS</div><div class="big" style="color:${imp>0?'var(--ok)':'var(--mut)'}">${imp>0?'−':''}${fmt(Math.abs(imp),1)}%</div><div class="row"><span style="color:var(--mut)">decision</span>${res.fb?`<span class="pill fb">fallback · ${res.fb}</span>`:'<span class="pill ok">solver order accepted</span>'}</div></div>`+
+c('MEV extracted (SOL)',m=>fmt(m.mev,4))+c('Avg slippage vs ref',m=>fmt(m.slip,3)+'%')+c('Ordering loss (SOL)',m=>fmt(m.loss,4))+c('Fairness (Kendall)',m=>fmt(m.fair,3))+c('Reverted txs',m=>m.reverts)}
+function load(){const j=preset==='random'?randomBatch($('#seed').value):{...PRESETS[preset],seed:$('#seed').value};return parse(j)}
+async function runSolver(){const btn=$('#run');btn.disabled=true;const b=load(),t0=performance.now(),q=qubo(b),gen=saTabu(q,b.seed),tr=[];let res;
+const fcfs=[...b.txs].sort((x,y)=>x.arrival-y.arrival).map(t=>t.id),F=verify(b,fcfs),Cn=verify(b,canonical(b));
+$('#srcinfo').textContent=`${preset} · ${b.txs.length} txs · ${q.n*q.n} QUBO vars · seed ${b.seed}`;
+await new Promise(done=>{const tick=()=>{for(let i=0;i<6;i++){const r=gen.next();if(r.done){res=r.value;return done()}tr.push(r.value)}drawEnergy(tr);$('#einfo').textContent=`iter ${tr[tr.length-1].iter} · E ${fmt(tr[tr.length-1].best,0)}`;setTimeout(tick,16)};tick()});
+tr.push({iter:(tr.at(-1)?.iter||0)+1,energy:res.energy,best:res.energy,temp:0});drawEnergy(tr);
+const raw=res.perm.map(i=>q.ids[i]),cand=polish(b,[raw,fcfs]),V=verify(b,cand);let O=V,fb=null;if(!V.pass)fb='verifier rejected';else if(V.m.score>Cn.m.score)fb='lost to canonical';if(fb)O=Cn;const ms=Math.round(performance.now()-t0);
+cards(F,O,Cn,{fb});lanes(b,[{name:'FCFS',note:'arrival order',v:F},{name:'SIMD optimized',note:fb?'fallback → canonical':`solver · raw: ${raw.join(' → ')}`,v:O},{name:'Canonical fallback',note:'fee desc, then sha256(seed,id)',v:Cn}]);
+const pid=b.pools[0].id;$('#pinfo').textContent=pid+' (A per B)';drawPrice([{d:F.path,c:'#ff5c7a',w:2.2},{d:Cn.path,c:'#ffb547',w:1.6,dash:[5,4]},{d:O.path,c:'#19d3c5',w:2.6}]);
+$('#einfo').textContent=`${tr.at(-2)?.iter||0} iters · best E ${fmt(res.energy,0)} · ${ms} ms`;$('#hash').textContent=`solver quantum-inspired-sa-tabu (classical) · ${ms} ms · verifier ${O.pass?'pass ✓':'fail'}`;btn.disabled=false}
+document.querySelectorAll('#presets button').forEach(bt=>bt.onclick=()=>{document.querySelectorAll('#presets button').forEach(x=>x.classList.remove('on'));bt.classList.add('on');preset=bt.dataset.p;$('#seed').value=preset==='random'?'rnd-'+Math.random().toString(36).slice(2,8):PRESETS[preset].seed;runSolver()});
+$('#run').onclick=runSolver;$('#seed').onkeydown=e=>{if(e.key==='Enter')runSolver()};addEventListener('load',runSolver);
+</script></body></html>
