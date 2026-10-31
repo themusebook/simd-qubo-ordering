@@ -1,3 +1,4 @@
 node_modules/
+browser/dist/
 *.log
 .DS_Store

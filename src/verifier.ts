@@ -2,6 +2,34 @@ import { createHash } from 'node:crypto';
 import type { Batch, Metrics, Tx, VerifyResult } from './types.ts';
 import { CU_SWAP, CU_TRANSFER } from './types.ts';
 import { apply, bToA, clonePools, quote } from './amm.ts';
+import { canonicalOrder, fcfsOrder, type TieBreak } from './canonical.ts';
+
+/**
+ * Verifier modes.
+ *
+ * SPEC mode (the default, per proposals/XXXX-qubo-transaction-ordering.md):
+ * the `noNewReverts` baseline is the CANONICAL order (priority fee desc, then the
+ * SHA-256 tie-break), so `pass` is recomputable by any observer from the block alone.
+ *
+ * LEGACY mode reproduces the historical live-prototype behaviour that the captured
+ * fixtures in fixtures/*.json were recorded against: the revert baseline is the
+ * arrival (FCFS) order. It exists only so the live-parity tests can keep
+ * reproducing those vectors; new code should not use it.
+ */
+export interface VerifyOptions {
+  /** Revert baseline for the noNewReverts constraint. Default: 'canonical' (spec). */
+  baseline?: 'canonical' | 'fcfs';
+  /** Tie-break used to compute the canonical baseline. Default: 'sha256' (spec). */
+  tieBreak?: TieBreak;
+}
+
+export const SPEC_VERIFY: VerifyOptions = { baseline: 'canonical', tieBreak: 'sha256' };
+export const LEGACY_VERIFY: VerifyOptions = { baseline: 'fcfs', tieBreak: 'sha1-compat' };
+
+/** The order whose revert set is the noNewReverts baseline under `opts`. */
+export function revertBaselineOrder(b: Batch, opts: VerifyOptions = {}): string[] {
+  return (opts.baseline ?? 'canonical') === 'fcfs' ? fcfsOrder(b) : canonicalOrder(b, opts.tieBreak ?? 'sha256');
+}
 
 const E6 = 1_000_000n;
 const LAMPORTS = 1e9;
@@ -115,8 +143,9 @@ export function score(b: Batch, order: string[]): Metrics & { _sim: SimOutcome }
   };
 }
 
-/** Full verifier: permutation validity, constraints, then deterministic metrics + state hash. */
-export function verify(b: Batch, order: string[]): VerifyResult {
+/** Full verifier: permutation validity, constraints, then deterministic metrics + state hash.
+ *  Spec mode by default (canonical revert baseline); pass LEGACY_VERIFY for live-parity reproduction. */
+export function verify(b: Batch, order: string[], opts: VerifyOptions = {}): VerifyResult {
   const violations: string[] = [];
   const ids = b.txs.map((t) => t.id);
   const set = new Set(order);
@@ -124,9 +153,9 @@ export function verify(b: Batch, order: string[]): VerifyResult {
     violations.push('not-a-permutation');
   }
   const m = score(b, violations.length ? ids : order);
-  const fcfs = [...b.txs].sort((x, y) => x.arrival - y.arrival).map((t) => t.id);
+  const fcfs = fcfsOrder(b);
   if (b.spec.noNewReverts) {
-    const base = new Set(simulate(b, fcfs).reverted);
+    const base = new Set(simulate(b, revertBaselineOrder(b, opts)).reverted);
     for (const r of m.revertedIds) if (!base.has(r)) violations.push(`new-revert:${r}`);
   }
   if (m.totalCu > b.spec.blockCuLimit) violations.push('block-cu-limit');
@@ -138,6 +167,12 @@ export function verify(b: Batch, order: string[]): VerifyResult {
     order.forEach((id, i) => { if (Math.abs(i - (rank.get(id) ?? i)) > b.spec.maxDisplacement!) violations.push(`displacement:${id}`); });
   }
   const { _sim, ...metrics } = m;
+  // State hash (spec, "Deterministic verifier" step 6). Byte layout, all UTF-8:
+  //   "simd-qubo-ordering/v1|" seed "|" order.join(",") "|"
+  //   then per pool, sorted by pool id:  poolId ":" reserveA ":" reserveB ";"
+  //   then per tx, in `order`:           txId "=" outcome ";"
+  // where outcome is the executed output amount (decimal), "R" if the tx reverted,
+  // or "-" for a non-swap tx. SHA-256 hex of the concatenation.
   const h = createHash('sha256');
   h.update(`simd-qubo-ordering/v1|${b.seed}|${order.join(',')}|`);
   for (const p of [..._sim.poolsAfter.values()].sort((x, y) => (x.id < y.id ? -1 : 1))) h.update(`${p.id}:${p.reserveA}:${p.reserveB};`);

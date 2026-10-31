@@ -6,3 +6,4 @@ export * from './qubo.ts';
 export * from './solver.ts';
 export * from './pipeline.ts';
 export * from './fixtures.ts';
+export * from './serialize.ts';

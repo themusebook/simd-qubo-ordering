@@ -7,10 +7,13 @@ import type { TieBreak } from './canonical.ts';
 const HELP = `simd-qubo-ordering — reference prototype (off-chain, not part of any validator)
 
 Usage:
-  node src/cli.ts <batch.json | -> [--tiebreak sha256|sha1-compat] [--iterations N] [--no-polish]
-                  [--external-url URL] [--json]
+  node src/cli.ts <batch.json | -> [--tiebreak sha256|sha1-compat] [--baseline canonical|fcfs]
+                  [--iterations N] [--no-polish] [--external-url URL] [--json]
 
   batch.json uses the shape of GET /api/simd420/demo?scenario=sandwich (see fixtures/).
+  Defaults are the spec mode: --tiebreak sha256, --baseline canonical (the noNewReverts
+  baseline is the canonical order). --baseline fcfs selects the legacy live-parity mode
+  (arrival-order revert baseline) that the captured fixtures were recorded against.
   --external-url POSTs {n, ids, terms, offset} and expects {assignment: number[]} (optional quantum hook).
 `;
 
@@ -28,8 +31,11 @@ const external: ExternalSolver | undefined = url ? {
   },
 } : undefined;
 
+const baseline = opt('--baseline');
+if (baseline !== undefined && baseline !== 'canonical' && baseline !== 'fcfs') { console.error(`--baseline must be canonical|fcfs, got ${baseline}`); process.exit(2); }
 const res = await run(batch, {
   tieBreak: (opt('--tiebreak') as TieBreak) ?? 'sha256',
+  baseline: (baseline as 'canonical' | 'fcfs' | undefined) ?? 'canonical',
   iterations: opt('--iterations') ? Number(opt('--iterations')) : undefined,
   polish: !args.includes('--no-polish'), external,
 });

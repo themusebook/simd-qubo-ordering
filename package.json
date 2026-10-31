@@ -4,13 +4,23 @@
   "description": "Reference prototype for a DRAFT SIMD: QUBO-encoded, verifier-gated transaction ordering with canonical fallback (off-chain, not part of any validator).",
   "type": "module",
   "license": "Apache-2.0",
-  "bin": { "simd-qubo-ordering": "src/cli.ts" },
-  "engines": { "node": ">=23.6" },
+  "bin": {
+    "simd-qubo-ordering": "src/cli.ts"
+  },
+  "engines": {
+    "node": ">=23.6"
+  },
   "scripts": {
     "test": "node --test test/*.test.ts",
     "typecheck": "tsc -p .",
+    "gen:conformance": "node scripts/generate-conformance.ts",
+    "build:browser": "esbuild browser/entry.ts --bundle --format=esm --platform=browser --target=es2022 --alias:node:crypto=./browser/crypto-shim.ts --alias:node:fs=./browser/fs-stub.ts --outfile=browser/dist/simd-client.js",
     "demo:sandwich": "node src/cli.ts fixtures/sandwich.json",
     "demo:mixed": "node src/cli.ts fixtures/mixed.json"
   },
-  "devDependencies": { "typescript": "^5.6.0", "@types/node": "^22.0.0" }
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.6.0"
+  }
 }
